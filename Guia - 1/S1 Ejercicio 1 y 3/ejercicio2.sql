@@ -1,0 +1,12 @@
+CREATE FUNCTION Ventas.ConvertirAMinusculas
+(
+    @Texto NVARCHAR(MAX)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    RETURN LOWER(@Texto);
+END;
+GO
+
+SELECT Ventas.ConvertirAMinusculas('TEXTO DE PRUEBA EN MAY�SCULAS');
