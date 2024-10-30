@@ -103,6 +103,7 @@ create table Cliente.Clientes(
     NombresCliente varchar(100) not null,
     ApellidosCliente varchar(100) not null,
     DuiCliente char(10) not null,
+	FechaNacimientoCliente date not null, -- Agregue este cambio para poder realizar el trigger #3
     TelefonoCliente varchar(15) not null,
     CorreoCliente varchar(100),
     IdDireccion int not null
@@ -137,6 +138,7 @@ create table Ventas.Pedidos(
     Cantidad_De_Pares int not null,
     Lotes int not null,
     Precio float not null,
+	IdEstadoPedido int not null, -- Agregue este cambio
     IdProveedor int not null,
     IdEmpleado int not null
 );
@@ -157,6 +159,7 @@ create table Ventas.Detalles_De_Ventas(
     IdFormaDePago int not null
 );
 
+
 create table Ventas.Detalles_De_Pedidos(
 	IdDetalleDePedido int primary key identity(1,1),
     PrecioUnitario float not null,
@@ -173,6 +176,8 @@ create table Ventas.Factura_De_Ventas(
 	IdFacturaVenta int primary key identity(1,1),
     TotalPagarVenta float not null,
     Fecha_Factura_Venta date not null,
+	IdEstadoFactura int not null, -- Agregue este cambio para poder realizar el trigger #2
+	FechaActualizacion datetime,
     IdDetalleDeVenta int not null,
     IdFormaDePago int not null
 );
@@ -181,9 +186,26 @@ create table Ventas.Factura_De_Compras(
 	IdFacturaCompra int primary key identity(1,1),
     TotalPagarCompra float not null,
     Fecha_Factura_Compra date not null,
+	IdEstadoFactura int not null,-- Agregue este cambio
+	FechaActualizacion datetime,
     IdDetalleDePedido int not null,
     IdFormaDePago int not null
 );
+
+
+-- TABLA PARA MANEJAR LOS ESTADOS DE LOS PEDIDOS
+create table Ventas.EstadosPedidos(
+	IdEstadoPedido int primary key identity(1,1),
+    Estado varchar(50) not null
+);
+
+
+-- TABLA PARA MANEJAR LOS ESTADOS DE LAS FACTURAS.
+create table Ventas.EstadosFacturas (
+    IdEstadoFactura int primary key identity(1,1),
+    Estado varchar(50) not null
+);
+
 
 -- TABLAS DE ROLES
 create table Rol.roles(
@@ -210,6 +232,13 @@ create table Rol.usuarios (
     IdEmpleado int not null
 );
 go
+
+-- LLAVES FORANEAS DE TABLA VENTAS.ESTADOS-PEDIDOS
+alter table Ventas.Pedidos add foreign key (IdEstadoPedido) references Ventas.EstadosPedidos(IdEstadoPedido);
+
+-- LLAVES FORANEAS DE TABLA VENTAS.ESTADOS-FACTURAS
+alter table Ventas.Factura_De_Ventas add foreign key (IdEstadoFactura) references Ventas.EstadosFacturas(IdEstadoFactura);
+alter table Ventas.Factura_De_Compras add foreign key (IdEstadoFactura) references Ventas.EstadosFacturas(IdEstadoFactura);
 
 -- LLAVES FORANEAS DE ROLES
 alter table Rol.asignacionRolesOpciones add foreign key (IdRol) references Rol.roles(IdRol);
@@ -640,15 +669,17 @@ insert into Departamento.Direcciones (Linea1, Linea2, CodigoPostal, IdDistrito) 
 	('Urb Las Magnolias, Pol 21, #2-6', 'Casa de esquina', '01115', 'LLO01'),-- 9
 	('Caserio Florencia, 3era Calle, #5', 'Casa rosada', '02305', 'SON01');-- 10
     
-insert into Cliente.Clientes(NombresCliente, ApellidosCliente, DuiCliente, TelefonoCliente, CorreoCliente, IdDireccion) values
-	('José Luis', 'García Pérez', '56789012-3', '+503 7895-5368', 'garcia@hotmail.com', '1'), 
-	('Ana María', 'Rodríguez López', '34567890-1', '+503 7775-5590', 'anarodríguez@gmail.com', '2'),
-	('Juan Carlos', 'Martínez González', '23456789-0', '+503 7654-3210', 'martinez@hotmail.com', '3'),
-    ('Luis Ernesto', 'Rodríguez Torres', '45678901-2', '+503 7894-5678', 'luis.rodriguez@hotmail.com', 9),
-	('María Fernanda', 'Pérez Gutiérrez', '45678901-2', '+503 7695-2488', 'perez@gmail.com', '4'),
-	('Carlos Eduardo', 'López Rodríguez', '78901234-5', '+503 7215-5658', 'eduardo@hotmail.com', '5'),
-    ('Natalia Sofía', 'Martínez Álvarez', '90123456-7', '+503 7899-0123', 'sofia.martinez@gmail.com', 6),
-    ('Elena Fernanda', 'González Ruiz', '56789012-3', '+503 7895-6789', 'elena.gonzalez@gmail.com', 8);
+
+insert into Cliente.Clientes (NombresCliente, ApellidosCliente, DuiCliente, FechaNacimientoCliente, TelefonoCliente, CorreoCliente, IdDireccion) values
+    ('José Luis', 'García Pérez', '56789012-3', '2000-05-14', '+503 7895-5368', 'garcia@hotmail.com', '1'), 
+    ('Ana María', 'Rodríguez López', '34567890-1', '1998-09-20', '+503 7775-5590', 'anarodríguez@gmail.com', '2'),
+    ('Juan Carlos', 'Martínez González', '23456789-0', '1999-08-10', '+503 7654-3210', 'martinez@hotmail.com', '3'),
+    ('Luis Ernesto', 'Rodríguez Torres', '45678901-2', '1997-07-30', '+503 7894-5678', 'luis.rodriguez@hotmail.com', '9'),
+    ('María Fernanda', 'Pérez Gutiérrez', '45678901-2', '1995-06-18', '+503 7695-2488', 'perez@gmail.com', '4'),
+    ('Carlos Eduardo', 'López Rodríguez', '78901234-5', '1996-12-25', '+503 7215-5658', 'eduardo@hotmail.com', '5'),
+    ('Natalia Sofía', 'Martínez Álvarez', '90123456-7', '2001-02-15', '+503 7899-0123', 'sofia.martinez@gmail.com', '6'),
+    ('Elena Fernanda', 'González Ruiz', '56789012-3', '2002-03-27', '+503 7895-6789', 'elena.gonzalez@gmail.com', '8');
+
 
 insert into Ventas.Sucursales (TelefonoSucursal, IdDireccion) values
 	('+503 7685-4568','1'),
@@ -695,21 +726,37 @@ insert into Ventas.Ventas (Fecha_De_Venta, Total_De_Venta, Monto, IdCliente, IdE
     ('2024-12-15', 1, 950.00, 7, 7),
     ('2024-12-24', 1, 70.00, 8, 8);
 
-insert into Ventas.Pedidos (Fecha_De_Pedido, Cantidad_De_Pares, Lotes, Precio, IdProveedor, IdEmpleado) values
-	('2024-01-22', 50, 1, 6.500, 1, 2),
-	('2024-01-22', 50, 1, 6.000, 1, 2),
-	('2024-02-14', 50, 1, 5.500, 3, 2),
-	('2024-02-18', 50, 1, 4.500, 3, 2),
-	('2024-03-12', 50, 1, 7.500, 2, 2),
-    ('2024-04-01', 50, 1, 7.000, 2, 2),
-    ('2024-05-04', 50, 1, 6.500, 5, 2),
-    ('2024-06-20', 50, 1, 3.500, 6, 2),
-    ('2024-07-29', 50, 1, 37.500, 4, 2),
-    ('2024-07-16', 50, 1, 34.750, 4, 2),
-    ('2024-08-22', 50, 1, 3.750, 2, 2),
-    ('2024-09-02', 50, 1, 3.500, 1, 2),
-    ('2024-10-30', 50, 1, 40.000, 4, 2),
-    ('2024-10-24', 50, 1, 47.500, 4, 2);
+
+insert into Ventas.EstadosPedidos(Estado) values
+	('Enviado'),
+    ('En Proceso'),
+    ('Cancelado'),
+    ('Devuelto');
+
+
+insert into Ventas.EstadosFacturas (Estado) values
+    ('Pagada'),
+	('Pendiente'),
+    ('Enviada'),
+    ('Anulada');
+
+
+insert into Ventas.Pedidos (Fecha_De_Pedido, Cantidad_De_Pares, Lotes, Precio, IdEstadoPedido, IdProveedor, IdEmpleado) VALUES
+    ('2024-01-22', 50, 1, 6.500, 1, 2, 2),
+    ('2024-01-22', 50, 1, 6.000, 1, 2, 2),
+    ('2024-02-14', 50, 1, 5.500, 1, 2, 2),
+    ('2024-02-18', 50, 1, 4.500, 1, 2, 2),
+    ('2024-03-12', 50, 1, 7.500, 2, 2, 2),
+    ('2024-04-01', 50, 1, 7.000, 2, 2, 2),
+    ('2024-05-04', 50, 1, 6.500, 1, 2, 2),
+    ('2024-06-20', 50, 1, 3.500, 2, 2, 2),
+    ('2024-07-29', 50, 1, 37.500, 2, 2, 2),
+    ('2024-07-16', 50, 1, 34.750, 2, 2, 2),
+    ('2024-08-22', 50, 1, 3.750, 2, 2, 2),
+    ('2024-09-02', 50, 1, 3.500, 1, 2, 2),
+    ('2024-10-30', 50, 1, 40.000, 2, 2, 2),
+    ('2024-10-24', 50, 1, 47.500, 2, 2, 2);
+
 
 insert into Productos.Categoria (Categoria) values
 	('Deportivo'),
@@ -784,7 +831,9 @@ insert into Productos.Zapatos (Nombre, Descripcion, Color, Precio, Stock, IdMarc
 	('Nike Air Max Kids', 'Tenis deportivos para niños con unidad de aire visible', 'Azul', 75.00, 50, 11, 11, 1, 3),
 	('Adidas Superstar Kids', 'Tenis de cuero para niñas con punta de goma', 'Rosa', 70.00, 50, 12, 12, 2, 4),
     ('Gucci Leather Loafers', 'Mocasines de cuero para hombre', 'Negro', 800.00, 50, 13, 13, 1, 7),
-	('Gucci Leather Pumps', 'Zapatos de tacón de cuero para mujer', 'Rojo', 950.00, 50, 14, 14, 1, 7);
+	('Gucci Leather Pumps', 'Zapatos de tacón de cuero para mujer', 'Rojo', 950.00, 50, 14, 14, 1, 7),
+	('New Balance 574', 'Zapatillas deportivas de estilo retro con buena amortiguación', 'Gris', 110.00, 30, 2, 1, 2, 3);
+
 
 insert into Ventas.Detalles_De_Ventas (IdVenta, IdZapato, IdSucursal, Cantidad, PrecioUnitario, SubTotal, IdFormaDePago) values
 	(1, 1, 1, 1, 130.00, 130.00,1),
@@ -812,31 +861,31 @@ insert into Ventas.Detalles_De_Pedidos (PrecioUnitario, SubTotal, Fecha_De_Compr
     (800.00, 40.500, '2024-10-30', 40.500, 1, 13, 13, 4),
     (950.00, 47.500, '2024-10-24', 47.500, 2, 14, 14, 4);
     
-insert into Ventas.Factura_De_Ventas (TotalPagarVenta, Fecha_Factura_Venta, IdDetalleDeVenta, IdFormaDePago) values
-	(130.00, '2024-02-01', 1, 1),
-	(695.00, '2024-04-11', 2, 4),
-	(110.00, '2024-04-18', 3, 2),
-	(90.00, '2024-07-21', 4, 3),
-	(750.00, '2024-11-14', 5, 5),
-    (800.00, '2024-12-03', 6, 4),
-    (950.00, '2024-12-15', 7, 4),
-    (70.00, '2024-12-24', 8, 1);
+insert into Ventas.Factura_De_Ventas (TotalPagarVenta, Fecha_Factura_Venta, IdEstadoFactura, IdDetalleDeVenta, IdFormaDePago) values
+	(130.00, '2024-02-01', 1, 1, 1),
+	(695.00, '2024-04-11', 1, 2, 4),
+	(110.00, '2024-04-18', 2, 3, 2),
+	(90.00, '2024-07-21', 3, 4, 3),
+	(750.00, '2024-11-14', 3, 5, 5),
+    (800.00, '2024-12-03', 2, 6, 4),
+    (950.00, '2024-12-15', 1, 7, 4),
+    (70.00, '2024-12-24',2, 8, 1);
 
-insert into Ventas.Factura_De_Compras (TotalPagarCompra, Fecha_Factura_Compra, IdDetalleDePedido, IdFormaDePago) values
-	(6.500, '2024-01-22', 1, 4),
-	(6.000, '2024-01-22', 2, 4),
-	(5.500, '2024-02-14', 3, 4),
-	(4.500, '2024-02-18', 4, 4),
-	(7.500, '2024-05-12', 5, 4),
-    (7.000, '2024-04-01', 6, 4),
-    (6.500, '2024-05-04', 7, 4),
-    (3.500, '2024-06-20', 8, 4),
-    (37.500, '2024-07-29', 9, 4),
-    (34.750, '2024-07-16', 10, 4),
-    (3.750, '2024-08-22' , 11, 4),
-    (3.500, '2024-09-02', 12, 4),
-    (40.000, '2024-10-30', 13, 4),
-    (47.500, '2024-10-24', 14, 4);
+insert into Ventas.Factura_De_Compras (TotalPagarCompra, Fecha_Factura_Compra, IdEstadoFactura, IdDetalleDePedido, IdFormaDePago) values
+	(6.500, '2024-01-22', 1, 1, 4),
+	(6.000, '2024-01-22',2, 2, 4),
+	(5.500, '2024-02-14', 3, 3, 4),
+	(4.500, '2024-02-18', 1, 4, 4),
+	(7.500, '2024-05-12', 2, 5, 4),
+    (7.000, '2024-04-01', 3, 6, 4),
+    (6.500, '2024-05-04', 3, 7, 4),
+    (3.500, '2024-06-20', 2, 8, 4),
+    (37.500, '2024-07-29', 2, 9, 4),
+    (34.750, '2024-07-16', 1, 10, 4),
+    (3.750, '2024-08-22' , 1, 11, 4),
+    (3.500, '2024-09-02', 1, 12, 4),
+    (40.000, '2024-10-30', 1, 13, 4),
+    (47.500, '2024-10-24', 1, 14, 4);
 
 insert into Rol.roles (Rol) values
 	('SysAdmin'), -- 1
@@ -872,7 +921,9 @@ insert into Rol.opciones (Opcion) values
 	('Gestionar roles'), -- 23
     ('Gestionar opciones'), -- 24
     ('Gestionar asignacionRolesOpciones'), -- 25
-    ('Gestionar usuarios'); -- 26
+    ('Gestionar usuarios'), -- 26
+	('Gestionar EstadosPedidos'), --27
+	('Gestionar EstadosFacturas'); -- 28
 
 
 -- **********************
@@ -882,7 +933,7 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 -- PERMISO SOBRE TODAS LAS TABLAS LECTURAS Y MODIFICACION
 ('1', '1'), ('1', '2'), ('1', '3'), ('1', '4'), ('1', '5'), ('1', '6'),('1', '7'),('1', '8'),('1', '9'), ('1', '10'),
 ('1', '11'), ('1', '12'), ('1', '13'), ('1', '14'), ('1', '15'),('1', '16'),('1', '17'),('1', '18'),('1', '19'),
-('1', '20'), ('1', '21'), ('1', '22'), ('1', '23'), ('1', '24'), ('1', '25'),
+('1', '20'), ('1', '21'), ('1', '22'), ('1', '23'), ('1', '24'), ('1', '25'), ('1', '26'), ('1', '27'), ('1', '28'),
 
 -- *********************
 -- ****** GERENTE ******
@@ -894,26 +945,28 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('2', '5'), 
 ('2', '7'), 
 ('2', '8'),
-('1', '9'),
-('1', '10'),
-('1', '11'),
-('1', '12'), 
+('2', '9'),
+('2', '10'),
+('2', '11'),
+('2', '12'), 
 ('2', '18'), 
 ('2', '19'), 
-('1', '20'), 
-('1', '21'), 
-('1', '22'),
+('2', '20'), 
+('2', '21'), 
+('2', '22'),
+('2', '27'), 
+('2', '28'),
 
 -- PERMISO SOLO LECTURA
-('1', '13'),
-('1', '14'), 
-('1', '15'), 
-('1', '16'), 
-('1', '17'),
-('1', '23'),
-('1', '24'),
-('1', '25'),
-('1', '26'),
+('2', '13'),
+('2', '14'), 
+('2', '15'), 
+('2', '16'), 
+('2', '17'),
+('2', '23'),
+('2', '24'),
+('2', '25'),
+('2', '26'),
 
 -- ***********************
 -- ****** BODEGUERO ******
@@ -922,14 +975,14 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('3', '17'), 
 
 -- PERMISO DE LECTURA: Zapatos, Detalles de venta, Detalle de pedidos
-('3', '18'), ('3', '19'), ('3', '20'),
+('3', '18'), ('3', '19'), ('3', '20'),('3', '27'),
 
 
 -- ********************
 -- ****** CAJERO ******
 -- ********************
 -- PERMISO DE MODIFICACION Y LECTURA: Ventas, Formas de pago.
-('4', '12'), ('4', '13'),
+('4', '12'), ('4', '13'), ('4', '27'), ('4', '28'),
 
 -- PERMISO DE LECTURA: Detalles de ventas
 ('4', '19'),
@@ -942,7 +995,7 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('5', '8'), ('5', '12'), ('5', '19'), 
 
 -- PERMISO DE LECTURA: Pedidos
-('5', '11'),
+('5', '11'), ('5', '27'), ('5', '28'),
 
 
 -- ******************
@@ -1069,6 +1122,9 @@ grant select, insert, update, delete on Ventas.Detalles_De_Ventas to Gerente;
 grant select, insert, update, delete on Ventas.Detalles_De_Pedidos to Gerente;
 grant select, insert, update, delete on Ventas.Factura_De_Ventas to Gerente;
 grant select, insert, update, delete on Ventas.Factura_De_Compras to Gerente;
+grant select, insert, update, delete on Ventas.EstadosPedidos to Gerente;
+grant select, insert, update, delete on Ventas.EstadosFacturas to Gerente;
+
 
 grant select on Productos.Categoria to Gerente;
 grant select on Productos.Tipo_De_Material to Gerente;
@@ -1088,12 +1144,15 @@ grant select, insert, update, delete on Productos.Inventario to Bodeguero;
 grant select on Productos.Zapatos to Bodeguero;
 grant select on Ventas.Detalles_De_Ventas to Bodeguero;
 grant select on Ventas.Detalles_De_Pedidos to Bodeguero;
+grant select on Ventas.EstadosPedidos to Bodeguero;
 
 -- **********************************************
 -- ASIGNACION DE PRIVILEGIOS A ROLES: CAJERO
 -- **********************************************
 grant select, insert, update, delete on Ventas.Ventas to Cajero;
 grant select, insert, update, delete on Ventas.Formas_De_Pagos to Cajero;
+grant select, insert, update, delete on Ventas.EstadosPedidos to Cajero;
+grant select, insert, update, delete on Ventas.EstadosFacturas to Cajero;
 
 grant select on Ventas.Detalles_De_Ventas to Cajero;
 
@@ -1105,6 +1164,8 @@ grant select, insert, update, delete on Ventas.Ventas to Vendedor;
 grant select, insert, update, delete on Ventas.Detalles_De_Ventas to Vendedor;
 
 grant select on Ventas.Pedidos to Vendedor;
+grant select on Ventas.EstadosPedidos to Vendedor;
+grant select on Ventas.EstadosFacturas to Vendedor;
 
 -- **********************************************
 -- ASIGNACION DE PRIVILEGIOS A ROLES: RRHH
