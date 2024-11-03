@@ -1,3 +1,9 @@
+/*NOTA: Correr en este orden: el DLL --> Secuencias --> DML -->  DCL 
+
+  PROBAR SECUENCIAS: Hacer estas consultas y ver los resultados en los IDS de cada tabla: Select *from Cliente.HistorialDeComprasClientes; 
+  Select *from Productos.ZapatosMasVendidos;  --->  Select *from Persona.Empleados;  --->  Select *from Ventas.Factura_De_Ventas;
+*/
+
 create database zapateria;
 go
 
@@ -50,7 +56,7 @@ create table Persona.Cargos(
 );
 
 create table Persona.Empleados(
-	IdEmpleado int primary key identity(1, 1),
+	IdEmpleado varchar(20) primary key,   -- Cambio el tipo de dato del id empleado de int a varchar
     NombresEmpleado varchar(100) not null,
     ApellidosEmpleado varchar(100) not null,
     DuiEmpleado char(10) not null,
@@ -129,7 +135,7 @@ create table Ventas.Ventas(
     Total_De_Venta int not null,
     Monto float not null,
     IdCliente int not null,
-    IdEmpleado int not null
+    IdEmpleado varchar(20) not null
 );
 
 create table Ventas.Pedidos(
@@ -140,7 +146,7 @@ create table Ventas.Pedidos(
     Precio float not null,
 	IdEstadoPedido int not null, -- Agregue este cambio
     IdProveedor int not null,
-    IdEmpleado int not null
+    IdEmpleado varchar(20) not null
 );
 
 create table Ventas.Formas_De_Pagos(
@@ -174,6 +180,7 @@ create table Ventas.Detalles_De_Pedidos(
 
 create table Ventas.Factura_De_Ventas(
 	IdFacturaVenta int primary key identity(1,1),
+	NumFactura varchar(15) null, -- Agregamos el campo para l numero de factura que llevara impreso la misma.
     TotalPagarVenta float not null,
     Fecha_Factura_Venta date not null,
 	IdEstadoFactura int not null, -- Agregue este cambio para poder realizar el trigger #2
@@ -229,7 +236,7 @@ create table Rol.usuarios (
     Usuario varchar (50) not null,
     Contrasenia varchar(50) not null,
     IdRol int not null,
-    IdEmpleado int not null
+    IdEmpleado varchar(20) not null
 );
 go
 
@@ -710,21 +717,25 @@ insert into Persona.Empleados (NombresEmpleado, ApellidosEmpleado, DuiEmpleado, 
     ('Carlos Raul', 'Rodas Gonzalez', '04523695-5','963852741', '1990-02-02','+503 6552-4927', 'raul@hotmail.com', '2', '2'), -- Gerente
 	('Edgar Edgardo', 'Del Valle Garcia', '03210987-4','321654987','1980-03-03', '+503 6598-2346', 'edgar@outlook.com', '3', '3'), -- Bodeguero 
 	('Maria Jose', 'Perez de Hernandez', '06789012-1', '951753258','1985-04-04','+503 7985-2516', 'maria@gmail.com', '4', '4'), -- Cajera
-    ('Lucía Alexandra', 'Ramírez Flores', '78901234-5','987654321','2000-04-22', '+503 7897-8901', 'lucia.ramirez@outlook.com', 4, 9), -- Cajera
+    ('Lucía Alexandra', 'Ramírez Flores', '78901234-5','987654321','2000-04-22', '+503 7897-8901', 'lucia.ramirez@outlook.com', '4', '9'), -- Cajera
 	('Jose Miguel', 'Hernandez Figueroa', '07567012-2', '906325699','1996-02-02','+503 7785-2416', 'jose@hotmail.com', '5', '5'), -- Vendedor
     ('Katia Alejandra', 'Rivera Mejia', '03376911-4','906325700','1997-03-03', '+503 6785-2196', 'katia@gmail.com', '5', '7'), -- Vendedor
-    ('David Alejandro', 'Fernández Díaz', '89012345-6','754278785', '1999-11-02', '+503 7898-9012', 'david.fernandez@gmail.com', 5, 8), -- Vendedor
+    ('David Alejandro', 'Fernández Díaz', '89012345-6','754278785', '1999-11-02', '+503 7898-9012', 'david.fernandez@gmail.com', '5', '8'), -- Vendedor
     ('Owen Bladimir', 'Gomez Hernandez', '96459012-3','245712483', '1985-03-03', '+503 7985-2516', 'owen@gmail.com', '6', '6'); -- RRHH
 
 insert into Ventas.Ventas (Fecha_De_Venta, Total_De_Venta, Monto, IdCliente, IdEmpleado) values
-	('2024-02-01', 1, 130.00, 1, 6),
-	('2024-04-11', 1, 695.00, 2, 7),
-	('2024-04-18', 1, 110.00, 3, 8),
-	('2024-07-21', 1, 90.00, 4, 8),
-	('2024-11-14', 1, 750.00, 5, 7),
-    ('2024-12-03', 1, 800.00, 6, 6),
-    ('2024-12-15', 1, 950.00, 7, 7),
-    ('2024-12-24', 1, 70.00, 8, 8);
+	('2024-02-01', 1, 130.00, 1, 'EMP006-HF2024'),
+	('2024-04-11', 1, 695.00, 2, 'EMP007-RM2024'),
+	('2024-04-18', 1, 110.00, 3, 'EMP008-FD2024'),
+	('2024-07-21', 1, 90.00, 4, 'EMP008-FD2024'),
+	('2024-11-14', 1, 750.00, 5, 'EMP007-RM2024'),
+    ('2024-12-03', 1, 800.00, 6, 'EMP006-HF2024'),
+    ('2024-12-15', 1, 950.00, 7, 'EMP007-RM2024'),
+    ('2024-12-24', 1, 70.00, 8, 'EMP008-FD2024'),
+
+	('2024-10-31', 1, 110.00, 1, 'EMP006-HF2024'),
+	('2024-11-01', 1, 130.00, 3, 'EMP007-RM2024'),
+	('2024-11-04', 1, 140.00, 1, 'EMP007-RM2024');
 
 
 insert into Ventas.EstadosPedidos(Estado) values
@@ -742,20 +753,20 @@ insert into Ventas.EstadosFacturas (Estado) values
 
 
 insert into Ventas.Pedidos (Fecha_De_Pedido, Cantidad_De_Pares, Lotes, Precio, IdEstadoPedido, IdProveedor, IdEmpleado) VALUES
-    ('2024-01-22', 50, 1, 6.500, 1, 2, 2),
-    ('2024-01-22', 50, 1, 6.000, 1, 2, 2),
-    ('2024-02-14', 50, 1, 5.500, 1, 2, 2),
-    ('2024-02-18', 50, 1, 4.500, 1, 2, 2),
-    ('2024-03-12', 50, 1, 7.500, 2, 2, 2),
-    ('2024-04-01', 50, 1, 7.000, 2, 2, 2),
-    ('2024-05-04', 50, 1, 6.500, 1, 2, 2),
-    ('2024-06-20', 50, 1, 3.500, 2, 2, 2),
-    ('2024-07-29', 50, 1, 37.500, 2, 2, 2),
-    ('2024-07-16', 50, 1, 34.750, 2, 2, 2),
-    ('2024-08-22', 50, 1, 3.750, 2, 2, 2),
-    ('2024-09-02', 50, 1, 3.500, 1, 2, 2),
-    ('2024-10-30', 50, 1, 40.000, 2, 2, 2),
-    ('2024-10-24', 50, 1, 47.500, 2, 2, 2);
+    ('2024-01-22', 50, 1, 6.500, 1, 2, 'EMP002-RG2024'),
+    ('2024-01-22', 50, 1, 6.000, 1, 2, 'EMP002-RG2024'),
+    ('2024-02-14', 50, 1, 5.500, 1, 2, 'EMP002-RG2024'),
+    ('2024-02-18', 50, 1, 4.500, 1, 2, 'EMP002-RG2024'),
+    ('2024-03-12', 50, 1, 7.500, 2, 2, 'EMP002-RG2024'),
+    ('2024-04-01', 50, 1, 7.000, 2, 2, 'EMP002-RG2024'),
+    ('2024-05-04', 50, 1, 6.500, 1, 2, 'EMP002-RG2024'),
+    ('2024-06-20', 50, 1, 3.500, 2, 2, 'EMP002-RG2024'),
+    ('2024-07-29', 50, 1, 37.500, 2, 2, 'EMP002-RG2024'),
+    ('2024-07-16', 50, 1, 34.750, 2, 2, 'EMP002-RG2024'),
+    ('2024-08-22', 50, 1, 3.750, 2, 2, 'EMP002-RG2024'),
+    ('2024-09-02', 50, 1, 3.500, 1, 2, 'EMP002-RG2024'),
+    ('2024-10-30', 50, 1, 40.000, 2, 2, 'EMP002-RG2024'),
+    ('2024-10-24', 50, 1, 47.500, 2, 2, 'EMP002-RG2024');
 
 
 insert into Productos.Categoria (Categoria) values
@@ -843,7 +854,11 @@ insert into Ventas.Detalles_De_Ventas (IdVenta, IdZapato, IdSucursal, Cantidad, 
 	(5, 9, 5, 1, 750.00, 750.00,5),
 	(6, 13, 6, 1, 800.00, 800.00,4),
 	(7, 14, 3, 1, 950.00, 950.00,4),
-	(8, 8, 6, 1, 70.00, 70.00,1);
+	(8, 8, 6, 1, 70.00, 70.00,1),
+
+	(9, 3, 1, 1, 110.00, 110.00,2),
+	(10, 1, 3, 1, 130.00, 130.00,1),
+	(11, 6, 1, 1, 140.00, 140.00,2);
 
 insert into Ventas.Detalles_De_Pedidos (PrecioUnitario, SubTotal, Fecha_De_Compra, TotalPagarCompra, IdSucursal, IdPedido, IdZapato, IdFormaDePago) values
 	(130.00, 6.500, '2024-01-22', 6.500, 1, 1, 1, 4),
@@ -869,7 +884,11 @@ insert into Ventas.Factura_De_Ventas (TotalPagarVenta, Fecha_Factura_Venta, IdEs
 	(750.00, '2024-11-14', 3, 5, 5),
     (800.00, '2024-12-03', 2, 6, 4),
     (950.00, '2024-12-15', 1, 7, 4),
-    (70.00, '2024-12-24',2, 8, 1);
+    (70.00, '2024-12-24',2, 8, 1),
+
+	(110.00, '2024-10-31', 1, 9, 4),
+	(130.00, '2024-11-01', 1, 10, 1),
+	(140.00, '2024-11-04', 1, 11, 4);
 
 insert into Ventas.Factura_De_Compras (TotalPagarCompra, Fecha_Factura_Compra, IdEstadoFactura, IdDetalleDePedido, IdFormaDePago) values
 	(6.500, '2024-01-22', 1, 1, 4),
@@ -923,7 +942,9 @@ insert into Rol.opciones (Opcion) values
     ('Gestionar asignacionRolesOpciones'), -- 25
     ('Gestionar usuarios'), -- 26
 	('Gestionar EstadosPedidos'), --27
-	('Gestionar EstadosFacturas'); -- 28
+	('Gestionar EstadosFacturas'), -- 28
+	('Gestionar HistorialDeComprasClientes'), -- 29
+	('Gestionar ZapatosMasVendidos'); -- 30
 
 
 -- **********************
@@ -934,6 +955,7 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('1', '1'), ('1', '2'), ('1', '3'), ('1', '4'), ('1', '5'), ('1', '6'),('1', '7'),('1', '8'),('1', '9'), ('1', '10'),
 ('1', '11'), ('1', '12'), ('1', '13'), ('1', '14'), ('1', '15'),('1', '16'),('1', '17'),('1', '18'),('1', '19'),
 ('1', '20'), ('1', '21'), ('1', '22'), ('1', '23'), ('1', '24'), ('1', '25'), ('1', '26'), ('1', '27'), ('1', '28'),
+('1', '29'), ('1', '30'),
 
 -- *********************
 -- ****** GERENTE ******
@@ -956,6 +978,8 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('2', '22'),
 ('2', '27'), 
 ('2', '28'),
+('2', '29'),
+('2', '30'),
 
 -- PERMISO SOLO LECTURA
 ('2', '13'),
@@ -985,7 +1009,7 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('4', '12'), ('4', '13'), ('4', '27'), ('4', '28'),
 
 -- PERMISO DE LECTURA: Detalles de ventas
-('4', '19'),
+('4', '19'),('4', '28'), ('4', '29'),('4', '30'),
 
 
 -- **********************
@@ -995,7 +1019,7 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('5', '8'), ('5', '12'), ('5', '19'), 
 
 -- PERMISO DE LECTURA: Pedidos
-('5', '11'), ('5', '27'), ('5', '28'),
+('5', '11'), ('5', '27'), ('5', '28'), ('5', '29'), ('5', '30'),
 
 
 -- ******************
@@ -1008,12 +1032,12 @@ insert into Rol.asignacionRolesOpciones (IdRol, IdOpcion) values
 ('6', '2'), ('6', '3'), ('6', '4'), ('6', '5'), ('6', '6');
 
 insert into Rol.usuarios(usuario, Contrasenia, IdRol,IdEmpleado)values
-('sys_AlejandroSanchez', 'root', '1','1'), -- SysAdmin
-('geren_CarlosRodas', '2020', '2', '2'), -- Gerente
-('bode_EdgarDelValle', '3030', '3', '3'), -- Bodeguero
-('caje_MariaPerez', '4040', '4', '4'), -- Cajero
-('vende_JoséHernandez', '5050', '5', '5'), -- Vendedor
-('rrhh_OwenGomez', '6060', '6', '6'); -- RRHH
+('sys_AlejandroSanchez', 'root', '1','EMP001-SC2024'), -- SysAdmin
+('geren_CarlosRodas', '2020', '2', 'EMP002-RG2024'), -- Gerente
+('bode_EdgarDelValle', '3030', '3', 'EMP003-DV2024'), -- Bodeguero
+('caje_MariaPerez', '4040', '4', 'EMP004-Pd2024'), -- Cajero
+('vende_JoséHernandez', '5050', '5', 'EMP006-HF2024'), -- Vendedor
+('rrhh_OwenGomez', '6060', '6', 'EMP009-GH2024'); -- RRHH
 go
 
 
@@ -1124,6 +1148,8 @@ grant select, insert, update, delete on Ventas.Factura_De_Ventas to Gerente;
 grant select, insert, update, delete on Ventas.Factura_De_Compras to Gerente;
 grant select, insert, update, delete on Ventas.EstadosPedidos to Gerente;
 grant select, insert, update, delete on Ventas.EstadosFacturas to Gerente;
+grant select, insert, update, delete on Cliente.HistorialDeComprasClientes to Gerente;
+grant select, insert, update, delete on Productos.ZapatosMasVendidos to Gerente;
 
 
 grant select on Productos.Categoria to Gerente;
@@ -1154,7 +1180,10 @@ grant select, insert, update, delete on Ventas.Formas_De_Pagos to Cajero;
 grant select, insert, update, delete on Ventas.EstadosPedidos to Cajero;
 grant select, insert, update, delete on Ventas.EstadosFacturas to Cajero;
 
+
 grant select on Ventas.Detalles_De_Ventas to Cajero;
+grant select on  Cliente.HistorialDeComprasClientes to Cajero;
+grant select on Productos.ZapatosMasVendidos to Cajero;
 
 -- **********************************************
 -- ASIGNACION DE PRIVILEGIOS A ROLES: VENDEDOR
@@ -1166,6 +1195,8 @@ grant select, insert, update, delete on Ventas.Detalles_De_Ventas to Vendedor;
 grant select on Ventas.Pedidos to Vendedor;
 grant select on Ventas.EstadosPedidos to Vendedor;
 grant select on Ventas.EstadosFacturas to Vendedor;
+grant select on Cliente.HistorialDeComprasClientes to Vendedor;
+grant select on Productos.ZapatosMasVendidos to Vendedor;
 
 -- **********************************************
 -- ASIGNACION DE PRIVILEGIOS A ROLES: RRHH
@@ -1181,7 +1212,6 @@ grant select on Departamento.Departamentos to RRHH;
 grant select on Departamento.Municipios to RRHH;
 grant select on Departamento.Distritos to RRHH;
 grant select on Departamento.Direcciones to RRHH;
-go
 
 -- Consulta para obtener una lista de logins en la instancia de SQL Server
 select name from sys.server_principals where type_desc = 'SQL_LOGIN';
