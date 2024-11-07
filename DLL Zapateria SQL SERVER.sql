@@ -101,8 +101,10 @@ create table Productos.Zapatos(
     IdMarca int not null,
     IdInventario int not null,
     IdTipoDeMaterial int not null,
-    IdCategoria int not null
+    IdCategoria int not null,
+	IdProveedor int not null -- nueva incorporacion
 );
+
 
 create table Cliente.Clientes(
 	IdCliente int primary key identity(1,1),
@@ -186,8 +188,11 @@ create table Ventas.Factura_De_Ventas(
 	IdEstadoFactura int not null, -- Agregue este cambio para poder realizar el trigger #2
 	FechaActualizacion datetime,
     IdDetalleDeVenta int not null,
-    IdFormaDePago int not null
+    IdFormaDePago int not null,
+	IdCliente int not null,
+	IdEmpleado varchar(20) not null
 );
+
 
 create table Ventas.Factura_De_Compras(
 	IdFacturaCompra int primary key identity(1,1),
@@ -238,6 +243,36 @@ create table Rol.usuarios (
     IdRol int not null,
     IdEmpleado varchar(20) not null
 );
+go
+
+create table Productos.ZapatosMasVendidos (
+    IdZapatoMasVendido varchar(7) primary key,
+    Nombre varchar(100) not null,
+    Color varchar(50) not null,
+    Precio decimal(10, 2) not null,
+    CantidadVendidos int not null
+);
+go
+
+create table Cliente.HistorialDeComprasClientes (
+    Id varchar(15) primary key,
+    Nombres varchar(100) not null,
+    Apellidos varchar(100) not null,
+    Dui char(10) not null,
+    Compras decimal(10, 2) default 0,
+    Telefono varchar(15) not null,
+    Correo varchar(100) not null,
+    IdDireccion int not null,
+    IdCliente int not null
+);
+go
+
+alter table Productos.Zapatos add foreign key (IdProveedor) references Ventas.Proveedores(IdProveedor);
+alter table Ventas.Factura_De_Ventas add foreign key (IdCliente) references Cliente.Clientes(IdCliente);
+alter table Ventas.Factura_De_Ventas add foreign key (IdEmpleado) references Persona.Empleados(IdEmpleado);
+
+-- Relacion de llave foranea
+alter table Cliente.HistorialDeComprasClientes add foreign key (IdCliente) references Cliente.Clientes(IdCliente);
 go
 
 -- LLAVES FORANEAS DE TABLA VENTAS.ESTADOS-PEDIDOS
@@ -306,14 +341,256 @@ alter table Ventas.Factura_De_Ventas add foreign key (IdDetalleDeVenta) referenc
 alter table Ventas.Factura_De_Ventas add foreign key (IdFormaDePago) references Ventas.Formas_De_Pagos(IdFormaDePago);
 go
 
--- CONSULATA DE PRUEBA
-select 
-	 v.IdVenta, c.NombresCliente, c.ApellidosCliente, c.DuiCliente, 
-     c.TelefonoCliente, v.Fecha_De_Venta, s.NombresEmpleado, s.ApellidosEmpleado, v.Monto
-from Ventas.Ventas v
-inner join Cliente.Clientes c on v.IdCliente = c.IdCliente
-inner join Persona.Empleados s on v.IdEmpleado = s.IdEmpleado
-inner join Ventas.Detalles_De_Ventas detav on v.IdVenta = detav.IdVenta;
+-- AGREGO ESTO AQUI POR QUE SE TIENE QUE CORRER DESPUES DE LA CREACION DE TABLAS Y LLAVES FORANEAS PARA 
+-- GENERAR LOS ID DE ALGUNAS TABLAS CUANDO SE HAGAN LAS INSERCIONES
+
+-- Secuencia 1: SeqIdHistorialDeComprasClientes
+create sequence SeqIdHistorialDeComprasClientes
+    start with 1
+    increment by 1
+    minvalue 1
+    maxvalue 9999
+    no cycle;
+go
+
+-- Trigger: trg_ActualizarHistorialDeComprasClientes
+create or alter trigger trgActualizarHistorialDeComprasClientes
+on Ventas.Ventas
+after insert
+as begin
+    declare @cliente_id int, @apellidos varchar(100), @nombres varchar(100), @dui char(10), @telefono varchar(15), @correo varchar(100),
+            @idDireccion int, @totalcompras decimal(10, 2), @iniciales_apellidos char(2), @id varchar(15), @numero int;
+
+    -- Iterar por cada nueva venta realizada
+    declare cur cursor for
+    select IdCliente, Total_De_Venta from inserted;
+
+    open cur;
+    fetch next from cur into @cliente_id, @totalcompras;
+
+    while @@fetch_status = 0
+    begin
+        -- Agarrar info del cliente
+        select @apellidos = ApellidosCliente, @nombres = NombresCliente, @dui = DuiCliente, @telefono = TelefonoCliente, @correo = CorreoCliente, 
+		@idDireccion = IdDireccion from Cliente.Clientes where IdCliente = @cliente_id;
+
+        -- Ver si el cliente ya está en la tabla que creamos 
+        if not exists (select 1 from Cliente.HistorialDeComprasClientes where IdCliente = @cliente_id)
+        begin
+            set @iniciales_apellidos = left(@apellidos, 1) + substring(@apellidos, charindex(' ', @apellidos) + 1, 1);
+
+            set @numero = next value for SeqIdHistorialDeComprasClientes;
+            set @id = @iniciales_apellidos + right('0000' + cast(@numero as varchar), 4);
+
+            -- Agregar el cliente en Cliente.HistorialDeComprasClientes
+            insert into Cliente.HistorialDeComprasClientes (Id, Nombres, Apellidos, Dui, Compras, Telefono, Correo, IdDireccion, IdCliente)
+            values (@id, @nombres, @apellidos, @dui, @totalcompras, @telefono, @correo, @idDireccion, @cliente_id);
+        end
+        else
+        begin
+            -- Si el cliente existe, sumar el total de la venta al total de compras
+            update Cliente.HistorialDeComprasClientes set Compras = Compras + @totalcompras where IdCliente = @cliente_id;
+        end
+        fetch next from cur into @cliente_id, @totalcompras;
+    end
+    close cur;
+    deallocate cur;
+end;
+go
+
+-- SECUENCIA 2: Crearemos una tabla para ver los zapatos mas vendidos, id de la tabla hecho con secuencia, trigger y cursores
+
+create sequence SeqIdZapatosMasVendidos
+	start with 1
+	increment by 1
+	minvalue 1
+	maxvalue 9999
+	no cycle;
+go
+
+create or alter trigger trgAsignarIDZapatoMasVendido
+on Productos.ZapatosMasVendidos
+after insert
+as begin
+    declare @correlativo int, @idProducto varchar(7);
+
+    declare cur cursor for
+    select IdZapatoMasVendido from inserted where IdZapatoMasVendido is null;
+
+    open cur;
+    fetch next from cur into @idProducto;
+
+    while @@fetch_status = 0
+    begin
+        set @correlativo = next value for SeqIdZapatosMasVendidos;
+        set @idProducto = 'ZA' + right('0000' + cast(@correlativo as varchar(4)), 4);
+
+        update Productos.ZapatosMasVendidos set IdZapatoMasVendido = @idProducto where IdZapatoMasVendido is null;
+        fetch next from cur into @idProducto;
+    end
+    close cur;
+    deallocate cur;
+end;
+go
+
+create or alter trigger trgActualizarZapatosMasVendidos
+on Ventas.Detalles_De_Ventas
+after insert
+as begin
+    declare @idZapato int, @nombre varchar(100), @color varchar(50), @precio decimal(10, 2), @cantidad int;
+    
+    declare cur_vendidos cursor for
+    select IdZapato, sum(Cantidad) from inserted group by IdZapato;
+
+    open cur_vendidos;
+    fetch next from cur_vendidos into @idZapato, @cantidad;
+
+    while @@fetch_status = 0
+    begin
+        select @nombre = Nombre, @color = Color, @precio = Precio from Productos.Zapatos where IdZapato = @idZapato;
+
+        if exists (select 1 from Productos.ZapatosMasVendidos where Nombre = @nombre and Color = @color and Precio = @precio)
+        begin
+            update Productos.ZapatosMasVendidos set CantidadVendidos = CantidadVendidos + @cantidad
+            where Nombre = @nombre and Color = @color and Precio = @precio;
+        end
+        else
+        begin
+            declare @correlativo int, @idProducto varchar(7);
+            set @correlativo = next value for SeqIdZapatosMasVendidos;
+            set @idProducto = 'ZA' + right('0000' + cast(@correlativo as varchar(4)), 4);
+            insert into Productos.ZapatosMasVendidos (IdZapatoMasVendido, Nombre, Color, Precio, CantidadVendidos)
+            values (@idProducto, @nombre, @color, @precio, @cantidad);
+        end
+        fetch next from cur_vendidos into @idZapato, @cantidad;
+    end
+    close cur_vendidos;
+    deallocate cur_vendidos;
+end;
+go
+
+-- SECUENCIA 3: Aca modificamos el idEmpleado de Int a varchar(20), crearemos el id con secuencia, trigger, Precdimiento almacenado.
+create sequence SeqNumEmpleado
+    start with 1
+    increment by 1
+    minvalue 1
+    maxvalue 999
+    cycle;
+go
+
+create or alter procedure spObtenerSiguienteNumEmpleado
+as begin
+    declare @correlativo int;
+    set @correlativo = next value for SeqNumEmpleado;
+    return @correlativo;
+end;
+go
+
+create or alter trigger Persona.AsignarIdEmpleado
+on Persona.Empleados
+instead of insert
+as begin
+    declare @IdEmpleado varchar(20), @Correlativo int, @AnioActual char(4) = year(getdate()), @InicialesApellidos char(2);
+
+    -- Variables columnas de la tabla
+    declare @NombresEmpleado varchar(100), @ApellidosEmpleado varchar(100), @DuiEmpleado char(10), @ISSS_Empleado int, 
+			@Fecha_NacEmpleado date, @TelefonoEmpleado varchar(15), @CorreoEmpleado varchar(100), @IdCargo int, @IdDireccion int;
+
+    -- Iterar sobre cada fila insertada
+    declare cur cursor for
+    select NombresEmpleado, ApellidosEmpleado, DuiEmpleado, ISSS_Empleado, Fecha_NacEmpleado, TelefonoEmpleado, CorreoEmpleado, 
+	IdCargo, IdDireccion from inserted;
+
+    open cur;
+    fetch next from cur into @NombresEmpleado, @ApellidosEmpleado, @DuiEmpleado, @ISSS_Empleado, @Fecha_NacEmpleado, 
+							 @TelefonoEmpleado, @CorreoEmpleado, @IdCargo, @IdDireccion;
+
+    while @@fetch_status = 0
+    begin  -- Siguiente valor de la secuencia
+        exec @Correlativo = spObtenerSiguienteNumEmpleado;
+
+        set @InicialesApellidos = left(@ApellidosEmpleado, 1) + coalesce(substring(@ApellidosEmpleado, charindex(' ', @ApellidosEmpleado) + 1, 1), '');
+
+        set @IdEmpleado = concat('EMP', right('000' + cast(@Correlativo as varchar), 3), '-', @InicialesApellidos, @AnioActual);
+
+        -- Agregar en la tabla Persona.Empleados con el IdEmpleado hecho antes de esto
+        insert into Persona.Empleados (IdEmpleado, NombresEmpleado, ApellidosEmpleado, DuiEmpleado, ISSS_Empleado, 
+                                       Fecha_NacEmpleado, TelefonoEmpleado, CorreoEmpleado, IdCargo, IdDireccion)
+        values (@IdEmpleado, @NombresEmpleado, @ApellidosEmpleado, @DuiEmpleado, @ISSS_Empleado, @Fecha_NacEmpleado, 
+                @TelefonoEmpleado, @CorreoEmpleado, @IdCargo, @IdDireccion);
+
+        fetch next from cur into @NombresEmpleado, @ApellidosEmpleado, @DuiEmpleado, @ISSS_Empleado, 
+                                @Fecha_NacEmpleado, @TelefonoEmpleado, @CorreoEmpleado, @IdCargo, @IdDireccion;
+    end
+    close cur;
+    deallocate cur;
+end;
+go
+
+-- SECUENCIA 4: Hacer el Numero de factura que llevara impreso la misma, secuencia, trigger, funcionEscalar,
+create sequence SeqNumeroFactura
+    start with 1
+    increment by 1
+    minvalue 1
+    maxvalue 999999
+    no cycle;
+go
+
+create or alter procedure spObtenerSiguienteNumFactura
+as begin
+    declare @correlativo int;
+    set @correlativo = next value for SeqNumeroFactura;
+    return @correlativo;
+end;
+go
+
+
+create or alter function fnGenerarNumFactura(@anio int)
+returns varchar(15)
+as begin
+    declare @numeroFactura varchar(15), @correlativo int;
+    exec @correlativo = spObtenerSiguienteNumFactura;
+    set @numeroFactura = 'FAC' + cast(@anio as varchar(4)) + '-' + right('0000' + cast(@correlativo as varchar(4)), 4);
+    return @numeroFactura;
+end;
+go
+
+create or alter trigger trgAsignarNumFactura
+on Ventas.Factura_De_Ventas
+instead of insert
+as
+begin
+    declare @anio int, @numeroGenerado varchar(15), @correlativo int;
+    declare @TotalPagarVenta float, @Fecha_Factura_Venta date, @IdEstadoFactura int,
+            @IdDetalleDeVenta int, @IdFormaDePago int, @IdCliente int, @IdEmpleado varchar(20);
+
+    set @anio = year(getdate());
+
+    -- Iterar sobre cada fila insertada para asignar un Numfactura único
+    declare cur cursor for
+    select TotalPagarVenta, Fecha_Factura_Venta, IdEstadoFactura, IdDetalleDeVenta, IdFormaDePago, IdCliente, IdEmpleado from inserted;
+
+    open cur;
+    fetch next from cur into @TotalPagarVenta, @Fecha_Factura_Venta, @IdEstadoFactura, @IdDetalleDeVenta, @IdFormaDePago, @IdCliente, @IdEmpleado;
+
+    while @@fetch_status = 0
+    begin
+        -- Obtener el siguiente valor de la secuencia
+        set @correlativo = next value for SeqNumeroFactura;
+
+        -- Generar el número de factura
+        set @numeroGenerado = 'FAC' + cast(@anio as varchar(4)) + '-' + right('0000' + cast(@correlativo as varchar(4)), 4);
+
+        -- Insertar en la tabla Ventas.Factura_De_Ventas con el NumFactura generado y otros valores
+        insert into Ventas.Factura_De_Ventas (NumFactura, TotalPagarVenta, Fecha_Factura_Venta, IdEstadoFactura, IdDetalleDeVenta, IdFormaDePago, IdCliente, IdEmpleado)
+        values (@numeroGenerado, @TotalPagarVenta, @Fecha_Factura_Venta, @IdEstadoFactura, @IdDetalleDeVenta, @IdFormaDePago, @IdCliente, @IdEmpleado);
+
+        fetch next from cur into @TotalPagarVenta, @Fecha_Factura_Venta, @IdEstadoFactura, @IdDetalleDeVenta, @IdFormaDePago, @IdCliente, @IdEmpleado;
+    end
+
+    close cur;
+    deallocate cur;
+end;
 go
 
 -- *****************************
@@ -702,7 +979,8 @@ insert into Ventas.Proveedores (NombresProveedor, TelefonoProveedor, CorreoProve
 	('Puma', '+503 7475-5308', 'puma@hotmail.com', '7'),
 	('Gucchi', '+503 7424-1658', 'gucchi@gmail.com', '9'),
     ('Reebok', '+503 7227-2308', 'reebok@gmail.com', '3'),
-	('Converse', '+503 7765-9878', 'converse@hotmail.com', '10');
+	('Converse', '+503 7765-9878', 'converse@hotmail.com', '10'),
+	('New Balance', '+503 7865-3423', 'newbalance@hotmail.com', '9');
 
 insert into Persona.Cargos (Cargo) values
 	('SysAdmin'), -- 1
@@ -803,7 +1081,9 @@ insert into Productos.Inventario (Inventario, Estante, Pasillo) values
     ('Nike Air Max Kids','E11','P11'),
     ('Adidas Superstar Kids','E12','P12'),
     ('Gucci Leather Loafers','E13','P13'),
-    ('Gucci Leather Pumps','E14','P14');
+    ('Gucci Leather Pumps','E14','P14'),
+	('New Balance 574', 'E15', 'P15');
+
 
 insert into Productos.Marca (Nombres, Modelo) values
     ('Adidas', 'Adidas Stan Smith'),
@@ -819,7 +1099,8 @@ insert into Productos.Marca (Nombres, Modelo) values
     ('Nike', 'Nike Air Max Kids'),
     ('Adidas', 'Adidas Superstar Kids'),
     ('Gucci', 'Gucci Leather Loafers'),
-    ('Gucci', 'Gucci Leather Pumps');
+    ('Gucci', 'Gucci Leather Pumps'),
+	('New Balance', 'New Balance 574');
     
 insert into Ventas.Formas_De_Pagos (Tipo) values
 	('Efectivo'),
@@ -828,22 +1109,22 @@ insert into Ventas.Formas_De_Pagos (Tipo) values
 	('Transferencia'),
     ('Bitcoin'); 
 
-insert into Productos.Zapatos (Nombre, Descripcion, Color, Precio, Stock, IdMarca, IdInventario, IdTipoDeMaterial, IdCategoria) values
-	('Adidas Stan Smith','Tenis de cuero y suela de goma', 'Blanco', 130.00, 50, 1, 1, 1, 2),
-	('Adidas Superstar','Zapatilla clásica de cuero', 'Blanco', 120.00 , 50, 2, 2, 1, 2),
-	('Puma RS-X³ Puzzle','Zapatilla estilo retro de malla y cuero sintético', 'Varios Colores', 110.00, 50, 3, 3, 2, 1),
-	('Puma Future Rider','Inspiradas en estilo de los 80, con malla y una suela de goma ligera', 'Varios Colores', 90.00 , 50, 4, 4, 4, 2),
-	('Nike Air Max 270','Estilo urbano con unidad Air Max grande en el talón para una amortiguación y malla transpirable','Varios Colores', 150.00 ,50, 5, 5, 2, 1),
-    ('Nike Air Force 1','Diseño clásico y amortiguación de aire', 'Blanco', 140.00, 50, 6, 6, 2, 2),
-    ('Reebok Classic','Estilo clásico con parte superior de cuero', 'Blanco', 130.00, 50, 7, 7, 2, 5),
-    ('Converse Chuck Taylor','Zapatillas altas de lona', 'Negro', 70.00, 50, 8, 8, 3, 6),
-    ('Gucci Marmont Sandal', 'Sandalia de cuero con tacón', 'Negro', 750.00, 50, 9, 9, 1, 8),
-	('Gucci Horsebit Sandal', 'Sandalia de cuero con adorno Horsebit', 'Rojo', 695.00, 50, 10, 10, 1, 8),
-	('Nike Air Max Kids', 'Tenis deportivos para niños con unidad de aire visible', 'Azul', 75.00, 50, 11, 11, 1, 3),
-	('Adidas Superstar Kids', 'Tenis de cuero para niñas con punta de goma', 'Rosa', 70.00, 50, 12, 12, 2, 4),
-    ('Gucci Leather Loafers', 'Mocasines de cuero para hombre', 'Negro', 800.00, 50, 13, 13, 1, 7),
-	('Gucci Leather Pumps', 'Zapatos de tacón de cuero para mujer', 'Rojo', 950.00, 50, 14, 14, 1, 7),
-	('New Balance 574', 'Zapatillas deportivas de estilo retro con buena amortiguación', 'Gris', 110.00, 30, 2, 1, 2, 3);
+insert into Productos.Zapatos (Nombre, Descripcion, Color, Precio, Stock, IdMarca, IdInventario, IdTipoDeMaterial, IdCategoria, IdProveedor) values
+	('Adidas Stan Smith','Tenis de cuero y suela de goma', 'Blanco', 130.00, 50, 1, 1, 1, 2, 1),
+	('Adidas Superstar','Zapatilla clásica de cuero', 'Blanco', 120.00 , 50, 2, 2, 1, 2, 1),
+	('Puma RS-X³ Puzzle','Zapatilla estilo retro de malla y cuero sintético', 'Varios Colores', 110.00, 50, 3, 3, 2, 1, 3),
+	('Puma Future Rider','Inspiradas en estilo de los 80, con malla y una suela de goma ligera', 'Varios Colores', 90.00 , 50, 4, 4, 4, 2, 3),
+	('Nike Air Max 270','Estilo urbano con unidad Air Max grande en el talón para una amortiguación y malla transpirable','Varios Colores', 150.00 ,50, 5, 5, 2, 1, 2),
+    ('Nike Air Force 1','Diseño clásico y amortiguación de aire', 'Blanco', 140.00, 50, 6, 6, 2, 2, 2),
+    ('Reebok Classic','Estilo clásico con parte superior de cuero', 'Blanco', 130.00, 50, 7, 7, 2, 5, 5),
+    ('Converse Chuck Taylor','Zapatillas altas de lona', 'Negro', 70.00, 50, 8, 8, 3, 6, 6),
+    ('Gucci Marmont Sandal', 'Sandalia de cuero con tacón', 'Negro', 750.00, 50, 9, 9, 1, 8, 4),
+	('Gucci Horsebit Sandal', 'Sandalia de cuero con adorno Horsebit', 'Rojo', 695.00, 50, 10, 10, 1, 8, 4),
+	('Nike Air Max Kids', 'Tenis deportivos para niños con unidad de aire visible', 'Azul', 75.00, 50, 11, 11, 1, 3, 2),
+	('Adidas Superstar Kids', 'Tenis de cuero para niñas con punta de goma', 'Rosa', 70.00, 50, 12, 12, 2, 4, 1),
+    ('Gucci Leather Loafers', 'Mocasines de cuero para hombre', 'Negro', 800.00, 50, 13, 13, 1, 7, 4),
+	('Gucci Leather Pumps', 'Zapatos de tacón de cuero para mujer', 'Rojo', 950.00, 50, 14, 14, 1, 7, 4),
+	('New Balance 574', 'Zapatillas deportivas de estilo retro con buena amortiguación', 'Gris', 110.00, 50, 15, 15, 2, 5, 7);
 
 
 insert into Ventas.Detalles_De_Ventas (IdVenta, IdZapato, IdSucursal, Cantidad, PrecioUnitario, SubTotal, IdFormaDePago) values
@@ -876,19 +1157,19 @@ insert into Ventas.Detalles_De_Pedidos (PrecioUnitario, SubTotal, Fecha_De_Compr
     (800.00, 40.500, '2024-10-30', 40.500, 1, 13, 13, 4),
     (950.00, 47.500, '2024-10-24', 47.500, 2, 14, 14, 4);
     
-insert into Ventas.Factura_De_Ventas (TotalPagarVenta, Fecha_Factura_Venta, IdEstadoFactura, IdDetalleDeVenta, IdFormaDePago) values
-	(130.00, '2024-02-01', 1, 1, 1),
-	(695.00, '2024-04-11', 1, 2, 4),
-	(110.00, '2024-04-18', 2, 3, 2),
-	(90.00, '2024-07-21', 3, 4, 3),
-	(750.00, '2024-11-14', 3, 5, 5),
-    (800.00, '2024-12-03', 2, 6, 4),
-    (950.00, '2024-12-15', 1, 7, 4),
-    (70.00, '2024-12-24',2, 8, 1),
+insert into Ventas.Factura_De_Ventas (TotalPagarVenta, Fecha_Factura_Venta, IdEstadoFactura, IdDetalleDeVenta, IdFormaDePago, IdCliente, IdEmpleado) values
+	(130.00, '2024-02-01', 1, 1, 1, 1, 'EMP006-HF2024'),
+	(695.00, '2024-04-11', 1, 2, 4, 2, 'EMP007-RM2024'),
+	(110.00, '2024-04-18', 2, 3, 2, 3, 'EMP008-FD2024'),
+	(90.00, '2024-07-21', 3, 4, 3, 4, 'EMP008-FD2024'),
+	(750.00, '2024-11-14', 3, 5, 5, 5, 'EMP007-RM2024'),
+    (800.00, '2024-12-03', 2, 6, 4, 6, 'EMP006-HF2024'),
+    (950.00, '2024-12-15', 1, 7, 4, 7, 'EMP007-RM2024'),
+    (70.00, '2024-12-24',2, 8, 1, 8, 'EMP008-FD2024'),
 
-	(110.00, '2024-10-31', 1, 9, 4),
-	(130.00, '2024-11-01', 1, 10, 1),
-	(140.00, '2024-11-04', 1, 11, 4);
+	(110.00, '2024-10-31', 1, 9, 4, 1, 'EMP006-HF2024'),
+	(130.00, '2024-11-01', 1, 10, 1, 3, 'EMP007-RM2024'),
+	(140.00, '2024-11-04', 1, 11, 4, 1, 'EMP007-RM2024');
 
 insert into Ventas.Factura_De_Compras (TotalPagarCompra, Fecha_Factura_Compra, IdEstadoFactura, IdDetalleDePedido, IdFormaDePago) values
 	(6.500, '2024-01-22', 1, 1, 4),
